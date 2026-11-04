@@ -26,6 +26,7 @@ public class TaskData {
         this.deadline = deadline;
         this.estimatedTimeMin = estimatedTimeMin;
         this.status = status;
+        updateWeight();
     }
 
     // Get current day, compare to deadline and estimated time to complete, calculate new weight
