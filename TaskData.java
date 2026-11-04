@@ -1,6 +1,19 @@
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
+/*
+-=[ About ]=-
+The main data container object.
+Most components will manipulate either a HashMap, List, or Set containing this object.
+
+-=[ Usage ]=-
+TaskData should be managed through an in-memory HashMap<TaskData, double>
+where the key is the task and value is the roulette probability,
+which is calculated using task.getWeight() / keys.size().
+
+When the user's day changes, call updateWeight() on all TaskData.
+*/
+
 public class TaskData {
     private String title;            // Task title
     private LocalDateTime deadline;  // Task due date (day only)
