@@ -11,7 +11,7 @@ FAILED: Task that is in the history. The user rolled and failed to complete this
 
 public enum TaskStatus {
     ACTIVE,
-    SELECTED,
     COMPLETED,
-    FAILED
+    FAILED,
+    SKIPPED
 }
