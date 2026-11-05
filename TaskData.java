@@ -48,8 +48,10 @@ public class TaskData {
         // TODO: Loop over 4 hour intervals until minutesBetweenMinusCompletionTime is less.
         //  The greater the number of iterations, the less the weight. Stop after a certain number to stop massive loops.
         int minutesInterval = 240;
-        while (minutesBetweenMinusCompletionTime > minutesInterval) {
+        int count = 0;
+        while (minutesBetweenMinusCompletionTime > minutesInterval && count < 42) {
             minutesInterval += 240; // Add 4 hours (in minutes)
+            count++;
         }
 
         // TODO: Calculate this somehow using minutesInterval % 240 = count of 4-hour intervals
