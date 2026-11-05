@@ -23,7 +23,7 @@ public class TaskData {
 
     public TaskData(String title, LocalDateTime deadline, int estimatedTimeMin, TaskStatus status) {
         this.title = title;
-        this.deadline = deadline;
+        this.deadline = deadline.withSecond(0).withNano(0);
         this.estimatedTimeMin = estimatedTimeMin;
         this.status = status;
         updateWeight();
