@@ -3,11 +3,16 @@ import com.google.gson.stream.JsonWriter;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 /*
 -=[ About ]=-
@@ -16,20 +21,28 @@ To avoid corruption, it writes to a temporary file before replacing the old data
 On Windows, files are saved in /Appdata/Roaming/RoulettePlanner
 
 -=[ Usage ]=-
+Loading:
 The manager component should call load() and store the values contained in the DataSnapshot.
 JSONStorage is not responsible for providing access to values after loading.
+
+Saving:
 The manager is responsible for telling JSONStorage to write the saved data
-by creating a DataSnapshot object and passing it through saveToFile().
+by creating a DataSnapshot object and passing it through updateData().
+Manually trigger a save with saveNow(). Only call this ONCE when closing the program!
 */
 
 public class JsonStorage {
     private static final String STORAGE_NAME = "data.json";
     private static final String TEMP_NAME = STORAGE_NAME + ".temp";
+
     private final Path dataFolder;
     private final Path dataFile;
     private final Path tempFile;
 
-    // Constructor
+    private final ScheduledExecutorService autoSave = Executors.newSingleThreadScheduledExecutor();
+    private ScheduledFuture<?> pendingSave;
+    private static final int autoSaveDelaySec = 10;
+
     public JsonStorage() {
         dataFolder = OSUtil.getDataFolder();
 
@@ -43,12 +56,17 @@ public class JsonStorage {
         }
     }
 
+
+    // =================================================================
+    // Public Methods
+    // =================================================================
+
     // Read the JSON file and provide it as a DataSnapshot record
     public DataSnapshot load() {
         if (ensureFileExists(dataFile, "{}")) {
             if (dataFile != null) {
                 try {
-                    String json = Files.readString(dataFile);
+                    String json = Files.readString(dataFile, StandardCharsets.UTF_8);
                     JsonObject root = JsonParser.parseString(json).getAsJsonObject();
 
                     // Read selected task or null it
@@ -94,13 +112,27 @@ public class JsonStorage {
                 }
             }
         }
+
+        // Reading failed
         return new DataSnapshot(null, new ArrayList<>(), new HashMap<>(), 0, new ArrayList<>());
+    }
+
+    // Pass an updated snapshot of the program data. Changes save to file after 10 seconds of inactivity.
+    public void updateData(DataSnapshot dataSnapshot) {
+        cancelPendingSave();
+        pendingSave = autoSave.schedule(() -> saveToFile(dataSnapshot), JsonStorage.autoSaveDelaySec, TimeUnit.SECONDS);
+    }
+
+    // Treat this as private! Only call it during program shutdown.
+    public void saveNow(DataSnapshot dataSnapshot) {
+        cancelPendingSave();
+        autoSave.execute(() -> saveToFile(dataSnapshot));
     }
 
     // Write a DataSnapshot record to the JSON file. The manager component should create this record
     public void saveToFile(DataSnapshot snapshot) {
         if (ensureFileExists(tempFile, "")) {
-            try (Writer fileWriter = Files.newBufferedWriter(tempFile);
+            try (Writer fileWriter = Files.newBufferedWriter(tempFile, StandardCharsets.UTF_8);
                  JsonWriter writer = new JsonWriter(fileWriter)) {
                 writer.setIndent("  ");
 
@@ -177,7 +209,6 @@ public class JsonStorage {
 
                 // Replace the old data file with the temp (avoids corruption)
                 Files.move(tempFile, dataFile, StandardCopyOption.REPLACE_EXISTING);
-
                 System.out.println("Data successfully saved!");
             } catch (Exception e) {
                 System.err.println("Failed to write JSON file: " + e.getMessage());
@@ -185,6 +216,11 @@ public class JsonStorage {
             }
         }
     }
+
+
+    // =================================================================
+    // Private Methods (all sections below are also private)
+    // =================================================================
 
     private boolean ensureFileExists(Path file, String contents) {
         try {
@@ -201,11 +237,23 @@ public class JsonStorage {
             }
             return true;
         } catch (IOException e) {
-            System.out.println("Failed to initialize storage file: " + e.getMessage());
+            System.out.println("Failed to initialize storage file '" + file.getFileName() + "': " + e.getMessage());
             e.printStackTrace();
         }
         return false;
     }
+
+    private void cancelPendingSave() {
+        if (pendingSave != null) {
+            pendingSave.cancel(false);
+            pendingSave = null;
+        }
+    }
+
+
+    // =================================================================
+    // Parsing Helpers (private)
+    // =================================================================
 
     private TaskData parseTaskObject(JsonObject obj) {
         String title = obj.has(Keys.TASK_TITLE) ? obj.get(Keys.TASK_TITLE).getAsString() : "";
@@ -221,6 +269,11 @@ public class JsonStorage {
 
         return new TaskData(title, deadline, estimatedTimeMin, status);
     }
+
+
+    // =================================================================
+    // JSON String Keys
+    // =================================================================
 
     private static class Keys {
         private static final String SELECTED_TASK = "selectedTask";
@@ -238,45 +291,65 @@ public class JsonStorage {
     }
 }
 
-// Sample JSON format
+// =================================================================
+// Sample JSON Structure
+// =================================================================
 /*
 
 
 {
-  "selectedTask": null,
-  "pointBalance": 250,
+  "selectedTask": {
+    "title": "Fix login page CSS overflow",
+    "deadline": "2026-11-06T11:43",
+    "estimatedTimeMin": 45,
+    "status": "SELECTED"
+  },
+  "pointBalance": 70,
   "activeTasks": [
     {
-      "title": "Finish documentation",
-      "deadline": "2026-11-07T14:01",
-      "estimatedTimeMin": 60,
+      "title": "Refactor data storage module",
+      "deadline": "2026-11-07T09:43",
+      "estimatedTimeMin": 120,
       "status": "ACTIVE"
     },
     {
-      "title": "Refactor storage module",
-      "deadline": "2026-11-05T19:01",
-      "estimatedTimeMin": 120,
+      "title": "Write unit tests for JSON parser",
+      "deadline": "2026-11-09T09:43",
+      "estimatedTimeMin": 90,
+      "status": "ACTIVE"
+    },
+    {
+      "title": "Update project README documentation",
+      "deadline": "2026-11-11T09:43",
+      "estimatedTimeMin": 60,
       "status": "ACTIVE"
     }
   ],
   "taskHistory": [
     {
-      "title": "Design database schema",
-      "deadline": "2026-11-02T14:01",
-      "estimatedTimeMin": 90,
+      "title": "Setup automated database backup script",
+      "deadline": "2026-11-05T09:43",
+      "estimatedTimeMin": 60,
       "status": "COMPLETED",
-      "pointsAwarded": 100
+      "pointsAwarded": 5
     },
     {
-      "title": "Setup project repository",
-      "deadline": "2026-10-31T14:01",
-      "estimatedTimeMin": 30,
+      "title": "Design user settings UI mockups",
+      "deadline": "2026-11-04T09:43",
+      "estimatedTimeMin": 150,
       "status": "COMPLETED",
-      "pointsAwarded": 50
+      "pointsAwarded": 5
+    },
+    {
+      "title": "Configure GitHub Actions CI/CD pipeline",
+      "deadline": "2026-11-03T09:43",
+      "estimatedTimeMin": 180,
+      "status": "FAILED",
+      "pointsAwarded": -10
     }
   ],
   "purchases": [
-    true,
+    false,
     false,
     true
   ]

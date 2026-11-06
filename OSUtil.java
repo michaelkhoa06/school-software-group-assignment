@@ -8,6 +8,7 @@ Used to determine where to store files.
 
 -=[ Usage ]=-
 Check OS type with OSUtil.getOS().
+Get the data folder path with OSUtil.getDataFolder().
 Should only be needed by storage component.
 */
 
@@ -51,8 +52,6 @@ public class OSUtil {
                 default -> System.out.println("Unknown operating system. I don't know where to save files!");
             }
         }
-        System.out.println(dataFolder);
-
         return dataFolder;
     }
 }

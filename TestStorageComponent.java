@@ -5,18 +5,18 @@ import java.util.Map;
 
 /*
 This is for testing the storage component. Do not include it in the final project!
+It picks a random DataSnapshot to save and load. Each snapshot has a different set of problems.
+It also loads the config file.
 */
 
 public class TestStorageComponent {
     public static void main(String[] args) {
-        System.out.println("Start");
-
         DataSnapshot allFieldsGood = new DataSnapshot(
                 new TaskData(
                         "Fix login page CSS overflow",
                         LocalDateTime.now().plusHours(2),
                         45,
-                        TaskStatus.SELECTED
+                        TaskStatus.ACTIVE
                 ),
                 List.of(
                         new TaskData(
@@ -103,7 +103,7 @@ public class TestStorageComponent {
                         "Finish documentation",
                         LocalDateTime.now().plusDays(2),
                         60,
-                        TaskStatus.SELECTED
+                        TaskStatus.ACTIVE
                 ),
                 List.of(
                         new TaskData(
@@ -154,14 +154,14 @@ public class TestStorageComponent {
                                 "Configure GitHub Actions CI/CD pipeline",
                                 LocalDateTime.now().minusDays(3),
                                 180,
-                                TaskStatus.COMPLETED
+                                TaskStatus.SKIPPED
                         ), -10,
                         new TaskData(
                                 "Initial Maven project scaffolding",
                                 LocalDateTime.now().minusDays(7),
                                 120,
                                 TaskStatus.FAILED
-                        ), 5,
+                        ), -5,
                         new TaskData(
                                 "Install and verify local dependencies",
                                 LocalDateTime.now().minusDays(8),
@@ -244,7 +244,7 @@ public class TestStorageComponent {
                                 "\n",
                                 LocalDateTime.now(),
                                 Integer.MIN_VALUE,
-                                TaskStatus.SELECTED
+                                TaskStatus.ACTIVE
                         ), Integer.MIN_VALUE
                 ),
                 Integer.MIN_VALUE,
@@ -282,5 +282,19 @@ public class TestStorageComponent {
             System.out.println(t + " -> PointsAwarded: " + snapshot.taskHistory().get(t));
         }
         System.out.println("\nPurchases: " + snapshot.purchases());
+
+
+        System.out.println("\n\n");
+
+        System.out.println("---------- Creating/Loading Config ----------");
+        Config config = new Config();
+
+        System.out.println("\n\n");
+
+        System.out.println("---------- Reading Config ----------");
+        System.out.println("Window Width: " + config.windowedWidth());
+        System.out.println("Window Height: " + config.windowedHeight());
+        System.out.println("Dark Mode: " + config.isDarkMode());
+        System.out.println("Spin Time: " + config.spinTimeSec());
     }
 }
