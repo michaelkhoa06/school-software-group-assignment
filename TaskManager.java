@@ -1,77 +1,76 @@
+import java.time.LocalDateTime;
 import java.util.HashMap;
 
+/*
+ * Manages TaskData objects using the shared HashMap from the other teammates.
+ *
+ * The Double value is reserved for the roulette probability.
+ * The teammate working on the roulette system will calculate/update it.
+ */
 public class TaskManager {
 
-    // Stores all tasks
-    private HashMap<Integer, Task> tasks;
-
-    // Gives every task a unique ID
-    private int nextId = 1;
-
-    // Tracks points for completed tasks
+    private final HashMap<TaskData, Double> tasks;
     private int points = 0;
 
-    // Connects to the HashMap from a teammate
-    public TaskManager(HashMap<Integer, Task> partnerTasks) {
+    // Connect to the HashMap created by another teammate.
+    public TaskManager(HashMap<TaskData, Double> partnerTasks) {
+        if (partnerTasks == null) {
+            throw new IllegalArgumentException("Task HashMap cannot be null.");
+        }
         tasks = partnerTasks;
+    }
 
-        // Find the next available task ID
-        for (int id : tasks.keySet()) {
-            if (id >= nextId) {
-                nextId = id + 1;
-            }
+    // Can also start the app with an empty HashMap.
+    public TaskManager() {
+        this(new HashMap<TaskData, Double>());
+    }
+
+    // Add a new task using TaskData's existing constructor.
+    public TaskData addTask(String title, LocalDateTime deadline, int estimatedTimeMin) {
+        TaskData newTask = new TaskData(title, deadline, estimatedTimeMin, TaskStatus.ACTIVE);
+        tasks.put(newTask, 0.0); // Roulette teammate will set the probability.
+        return newTask;
+    }
+
+    // Add a TaskData object that a teammate has already created.
+    public boolean addTask(TaskData task) {
+        if (task == null || tasks.containsKey(task)) {
+            return false;
         }
+        tasks.put(task, 0.0); // Placeholder until the roulette probability is calculated.
+        return true;
     }
 
-    // METHOD 1: Add a task
-    public void addTask(String title, String dueDate, String severity) {
-
-        Task newTask = new Task(title, dueDate, severity);
-
-        tasks.put(nextId, newTask);
-
-        System.out.println("Task added! ID: " + nextId);
-
-        nextId++;
-    }
-
-    // METHOD 2: Complete a task
-    public void completeTask(int id) {
-
-        if (tasks.containsKey(id)) {
-
-            Task task = tasks.get(id);
-
-            if (!task.completed) {
-                task.markComplete();
-                points += 10;
-                System.out.println("Task completed! +10 points");
-            } else {
-                System.out.println("Task is already completed.");
-            }
-
-        } else {
-            System.out.println("Task not found.");
+    // Mark an ACTIVE task as completed and award points only once.
+    public boolean completeTask(TaskData task) {
+        if (task == null || !tasks.containsKey(task)) {
+            return false;
         }
-    }
-
-    // METHOD 3: Remove a task
-    public void removeTask(int id) {
-
-        if (tasks.containsKey(id)) {
-            tasks.remove(id);
-            System.out.println("Task removed!");
-        } else {
-            System.out.println("Task not found.");
+        if (task.getStatus() != TaskStatus.ACTIVE) {
+            return false; // Already completed, failed, or skipped.
         }
+
+        task.setStatus(TaskStatus.COMPLETED);
+        tasks.put(task, 0.0); // A completed task should not be selected again.
+        points += 10;
+        return true;
     }
 
-    // Allows teammates to access all tasks
-    public HashMap<Integer, Task> getTasks() {
+    // Remove a task from the HashMap completely.
+    public boolean removeTask(TaskData task) {
+        if (task == null || !tasks.containsKey(task)) {
+            return false;
+        }
+        tasks.remove(task);
+        return true;
+    }
+
+    // Return the SAME HashMap used by the other teammates.
+    public HashMap<TaskData, Double> getTasks() {
         return tasks;
     }
 
-    // Allows the points shop to access earned points
+    // The points shop can read the total earned points.
     public int getPoints() {
         return points;
     }
