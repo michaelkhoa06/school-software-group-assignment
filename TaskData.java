@@ -11,14 +11,16 @@ TaskData should be managed through an in-memory HashMap<TaskData, double>
 where the key is the task and value is the roulette probability,
 which is calculated using task.getWeight() / keys.size().
 
-When the user's day changes, call updateWeight() on all TaskData.
+When the user's day changes, call updateWeight() on all TaskData. TODO: This is incorrect
 */
 
 public class TaskData {
+    private static LocalDateTime timeReference;  // Standardize so all weights are calculated from the same reference
+
     private String title;            // Task title
     private LocalDateTime deadline;  // Task due date (day only)
     private int estimatedTimeMin;    // User's estimated time to complete the task, in minutes
-    private double weight;           // Weight value computed on task creation. This is NOT roulette probability!
+    private double weight;              // Weight value computed on task creation. This is NOT roulette probability!
     private TaskStatus status;       // Is the task in active tasks, in history, or selected?
 
     public TaskData(String title, LocalDateTime deadline, int estimatedTimeMin, TaskStatus status) {
@@ -26,36 +28,26 @@ public class TaskData {
         this.deadline = deadline.withSecond(0).withNano(0);
         this.estimatedTimeMin = estimatedTimeMin;
         this.status = status;
-        updateWeight();
+        calculateWeight();
     }
 
-    // Get current day, compare to deadline and estimated time to complete, calculate new weight
-    public void updateWeight() {
-        LocalDateTime now = LocalDateTime.now().plusMinutes(estimatedTimeMin);
-        long minutesBetween = ChronoUnit.MINUTES.between(now, deadline);
-        long minutesBetweenMinusCompletionTime = minutesBetween - estimatedTimeMin;
+    public static void updateTimeReference() {
+        timeReference = LocalDateTime.now();
+    }
 
-        // Overdue with no time to work
-        if (minutesBetween <= 0) {
-            weight = 100; // placeholder
+    public void calculateWeight() {
+        if (timeReference == null) timeReference = LocalDateTime.now();
+
+        long minutesRemaining = ChronoUnit.MINUTES.between(timeReference, deadline);
+        long slackMinutes = minutesRemaining - estimatedTimeMin;
+
+        // No time remains to work
+        if (minutesRemaining <= 0) {
+            weight = 100.0;
+            return;
         }
 
-        // Less time available than estimated time to complete
-        else if (minutesBetweenMinusCompletionTime < 0) {
-            weight = 100; // placeholder
-        }
-
-        // TODO: Loop over 4 hour intervals until minutesBetweenMinusCompletionTime is less.
-        //  The greater the number of iterations, the less the weight. Stop after a certain number to stop massive loops.
-        int minutesInterval = 240;
-        int count = 0;
-        while (minutesBetweenMinusCompletionTime > minutesInterval && count < 42) {
-            minutesInterval += 240; // Add 4 hours (in minutes)
-            count++;
-        }
-
-        // TODO: Calculate this somehow using minutesInterval % 240 = count of 4-hour intervals
-        weight = minutesInterval % 240; // placeholder
+        weight = 100.0 / (1.0 + (slackMinutes / 60.0));
     }
 
 
@@ -85,6 +77,7 @@ public class TaskData {
 
     public void setDeadline(LocalDateTime deadline) {
         this.deadline = deadline;
+        calculateWeight();
     }
 
     public void setEstimatedTimeMin(int estimatedTimeMin) {
@@ -93,5 +86,10 @@ public class TaskData {
 
     public void setStatus(TaskStatus status) {
         this.status = status;
+    }
+
+    @Override
+    public String toString() {
+        return "Title=" + title + " Due=" + deadline + " EstTime=" + estimatedTimeMin + " Weight=" + weight + " Status=" + status;
     }
 }
