@@ -1,5 +1,13 @@
 import java.util.*;
 
+/*
+-=[ About ]=-
+Static helper methods for calculating probabilities and rolling tasks.
+
+-=[ Usage ]=-
+Used in Core component only.
+*/
+
 public class CalculationHelper {
     private CalculationHelper() {}
 
