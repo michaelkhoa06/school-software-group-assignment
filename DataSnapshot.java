@@ -1,5 +1,6 @@
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /*
 -=[ About ]=-
@@ -18,7 +19,7 @@ then passes it to the JSONStorage via saveToFile().
 
 public record DataSnapshot(
         TaskData selectedTask,
-        List<TaskData> activeTasks,
+        Set<TaskData> activeTasks,
         Map<TaskData, Integer> taskHistory,
         int pointBalance,
         List<Boolean> purchases

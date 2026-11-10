@@ -79,7 +79,7 @@ public class JsonStorage {
                     int pointBalance = root.has(Keys.POINT_BAL) ? root.get(Keys.POINT_BAL).getAsInt() : 0;
 
                     // Read active tasks and build a list
-                    List<TaskData> activeTasks = new ArrayList<>();
+                    Set<TaskData> activeTasks = new HashSet<>();
                     if (root.has(Keys.ACTIVE_TASKS) && !root.get(Keys.ACTIVE_TASKS).isJsonNull()) {
                         for (JsonElement element : root.get(Keys.ACTIVE_TASKS).getAsJsonArray()) {
                             JsonObject obj = element.getAsJsonObject();
@@ -114,7 +114,7 @@ public class JsonStorage {
         }
 
         // Reading failed
-        return new DataSnapshot(null, new ArrayList<>(), new HashMap<>(), 0, new ArrayList<>());
+        return new DataSnapshot(null, new HashSet<>(), new HashMap<>(), 0, new ArrayList<>());
     }
 
     // Pass an updated snapshot of the program data. Changes save to file after 10 seconds of inactivity.
@@ -129,8 +129,13 @@ public class JsonStorage {
         autoSave.execute(() -> saveToFile(dataSnapshot));
     }
 
+
+    // =================================================================
+    // Private Methods (all sections below are also private)
+    // =================================================================
+
     // Write a DataSnapshot record to the JSON file. The manager component should create this record
-    public void saveToFile(DataSnapshot snapshot) {
+    private void saveToFile(DataSnapshot snapshot) {
         if (ensureFileExists(tempFile, "")) {
             try (Writer fileWriter = Files.newBufferedWriter(tempFile, StandardCharsets.UTF_8);
                  JsonWriter writer = new JsonWriter(fileWriter)) {
@@ -216,11 +221,6 @@ public class JsonStorage {
             }
         }
     }
-
-
-    // =================================================================
-    // Private Methods (all sections below are also private)
-    // =================================================================
 
     private boolean ensureFileExists(Path file, String contents) {
         try {
