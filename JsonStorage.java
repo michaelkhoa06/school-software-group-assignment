@@ -79,11 +79,11 @@ public class JsonStorage {
                     int pointBalance = root.has(Keys.POINT_BAL) ? root.get(Keys.POINT_BAL).getAsInt() : 0;
 
                     // Read active tasks and build a list
-                    Set<TaskData> activeTasks = new HashSet<>();
+                    Map<TaskData> activeTasks = new HashMap<>();
                     if (root.has(Keys.ACTIVE_TASKS) && !root.get(Keys.ACTIVE_TASKS).isJsonNull()) {
                         for (JsonElement element : root.get(Keys.ACTIVE_TASKS).getAsJsonArray()) {
                             JsonObject obj = element.getAsJsonObject();
-                            activeTasks.add(parseTaskObject(obj));
+                            activeTasks.put(parseTaskObject(obj), 0.0);  // Fill with placeholder probability of 0.0
                         }
                     }
 
@@ -114,7 +114,7 @@ public class JsonStorage {
         }
 
         // Reading failed
-        return new DataSnapshot(null, new HashSet<>(), new HashMap<>(), 0, new ArrayList<>());
+        return new DataSnapshot(null, new HashMap<>(), new HashMap<>(), 0, new ArrayList<>());
     }
 
     // Pass an updated snapshot of the program data. Changes save to file after 10 seconds of inactivity.
@@ -168,7 +168,7 @@ public class JsonStorage {
                 writer.name(Keys.ACTIVE_TASKS);
                 writer.beginArray();
 
-                for (TaskData activeTask : snapshot.activeTasks()) {
+                for (TaskData activeTask : snapshot.activeTasks().keySet()) {
                     writer.beginObject();
 
                     writer.name(Keys.TASK_TITLE).value(activeTask.getTitle());
