@@ -183,7 +183,7 @@ public class RoulettePlannerCore {
         DataSnapshot snapshot = storage.load();
 
         activeTasks.clear();
-        Set<TaskData> loadedActiveTasks = snapshot.activeTasks();
+        Set<TaskData> loadedActiveTasks = snapshot.activeTasks().keySet();
         for (TaskData task : loadedActiveTasks) {
             activeTasks.put(task, CalculationHelper.calculateProbability(task, activeTasks.size()));
         }
