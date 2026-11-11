@@ -19,7 +19,7 @@ then passes it to the JSONStorage via saveToFile().
 
 public record DataSnapshot(
         TaskData selectedTask,
-        Set<TaskData> activeTasks,
+        Map<TaskData, Double> activeTasks,
         Map<TaskData, Integer> taskHistory,
         int pointBalance,
         List<Boolean> purchases
