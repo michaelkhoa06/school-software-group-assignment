@@ -1,133 +1,133 @@
-import java.time.Clock;
-import java.time.Duration;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
+
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 
 public class RouletteWheel {
 
-    // I'm starting with a 10% chance of getting a break.
-    // We can always change this when we put everyone's code together.
+    // Keeping the break chance at 10% for now, we can change it later.
     private static final double DEFAULT_BREAK_CHANCE = 0.10;
-    private static final double URGENCY_BOOST = 4.0;
-    private static final double TIME_REFERENCE = 60.0;
+    private static final double FALLBACK_WEIGHT = 100.0;
 
-    private Random random;
-    private Clock clock;
-    private Task breakTask;
+    private final Random random;
     private double breakChance;
 
     public RouletteWheel() {
-        this(new Random(), Clock.systemDefaultZone(), DEFAULT_BREAK_CHANCE);
+        this(new Random(), DEFAULT_BREAK_CHANCE);
     }
 
-    // I added this constructor so we can test the probabilities using a fixed time.
-    public RouletteWheel(Random random, Clock clock, double breakChance) {
-        if (random == null || clock == null) {
-            throw new IllegalArgumentException("Random and clock cannot be null");
+    // This also lets us use a specific Random object when testing.
+    public RouletteWheel(Random random, double breakChance) {
+        if (random == null) {
+            throw new IllegalArgumentException("Random cannot be null");
         }
 
         this.random = random;
-        this.clock = clock;
-        this.breakTask = Task.createBreakTask();
         setBreakProbability(breakChance);
     }
 
-    public void recalculateWeights(ArrayList<Task> tasks) {
+    public void recalculateWeights(HashMap<TaskData, Double> tasks) {
         if (tasks == null) {
-            throw new IllegalArgumentException("Task list cannot be null");
+            throw new IllegalArgumentException("Task map cannot be null");
         }
 
-        // If there aren't any assignments, there's nothing for the wheel to pick.
+        // No reason to calculate anything if there are no assignments.
         if (tasks.isEmpty()) {
-            breakTask.setWeight(0.0);
             return;
         }
 
-        LocalDateTime now = LocalDateTime.now(clock);
-        double[] scores = new double[tasks.size()];
-        double totalScore = 0.0;
+        // TaskData already calculates the weights, so I'm just updating
+        // them using the same time reference before finding probabilities.
+        TaskData.updateTimeReference();
 
-        // First, I'm giving every assignment a score based on its deadline
-        // and how long it should take to finish. Higher score = better chance.
-        for (int i = 0; i < tasks.size(); i++) {
-            Task task = tasks.get(i);
+        double totalWeight = 0.0;
 
-            if (task == null || task.isBreak()) {
-                throw new IllegalArgumentException("The list should only have active assignments");
+        // Adding all the assignment weights together so I can use
+        // the total to calculate each assignment's probability.
+        for (TaskData task : tasks.keySet()) {
+
+            if (task == null || task.getDeadline() == null ||
+                    task.getEstimatedTimeMin() <= 0) {
+                throw new IllegalArgumentException(
+                        "Each assignment needs a deadline and a positive estimated time");
             }
-            if (task.getDeadline() == null || task.getEstimatedMinutes() <= 0) {
-                throw new IllegalArgumentException("Every assignment needs a deadline and estimated time");
-            }
 
-            scores[i] = calculateScore(task, now);
-            totalScore += scores[i];
+            task.calculateWeight();
+            totalWeight += getValidWeight(task);
         }
 
-        // I'm saving 10% of the wheel for a break by default.
-        // The assignments split the remaining 90% based on their scores.
+        // Since 10% is for breaks, the assignments share the other 90%.
         double assignmentChance = 1.0 - breakChance;
 
-        for (int i = 0; i < tasks.size(); i++) {
-            double probability = assignmentChance * (scores[i] / totalScore);
-            tasks.get(i).setWeight(probability);
+        // Dividing each weight by the total to get its probability.
+        // The probability goes in the HashMap since TaskData already
+        // has its own weight that I don't want to overwrite.
+        for (Map.Entry<TaskData, Double> entry : tasks.entrySet()) {
+
+            double probability = assignmentChance *
+                    (getValidWeight(entry.getKey()) / totalWeight);
+
+            entry.setValue(probability);
+        }
+    }
+
+    private double getValidWeight(TaskData task) {
+        double weight = task.getWeight();
+
+        // Just making sure the weight isn't negative or infinite.
+        // Using 100 as a temporary value until we fix that issue in TaskData.
+        if (!Double.isFinite(weight) || weight <= 0.0) {
+            return FALLBACK_WEIGHT;
         }
 
-        breakTask.setWeight(breakChance);
+        return weight;
     }
 
-    private double calculateScore(Task task, LocalDateTime now) {
-        // An assignment that's due sooner should have a higher priority.
-        // If it's already overdue, I'm treating it like it's due right now.
-        double minutesLeft = Duration.between(now, task.getDeadline()).toMinutes();
-        minutesLeft = Math.max(0.0, minutesLeft);
-        double daysLeft = minutesLeft / 1440.0;
-
-        double deadlineScore = 1.0 + URGENCY_BOOST / (1.0 + daysLeft);
-
-        // I'm also considering the estimated time. If two assignments have
-        // the same deadline, the shorter one gets a little extra priority.
-        double timeScore = 1.0 + TIME_REFERENCE
-                / (TIME_REFERENCE + task.getEstimatedMinutes());
-
-        return deadlineScore * timeScore;
-    }
-
-    public Task spin(ArrayList<Task> tasks) {
+    public TaskData spin(HashMap<TaskData, Double> tasks) {
         if (tasks == null || tasks.isEmpty()) {
-            throw new IllegalStateException("Add an assignment before spinning the wheel");
+            throw new IllegalStateException(
+                    "Add an assignment before spinning the wheel");
         }
 
-        // Recalculate first in case an assignment was added, changed, or removed.
+        // Recalculating before each spin so the probabilities are updated.
         recalculateWeights(tasks);
 
-        // This gives me a random number between 0 and 1.
-        // I keep adding each assignment's probability until the number fits
-        // into one of those ranges. That's the assignment the wheel picks.
+        // Picking a random number between 0 and 1.
         double number = random.nextDouble();
         double currentChance = 0.0;
 
-        for (Task task : tasks) {
-            currentChance += task.getWeight();
+        TaskData lastTask = null;
+
+        // Adding the probabilities until the random number falls
+        // within one of the assignment's ranges.
+        for (Map.Entry<TaskData, Double> entry : tasks.entrySet()) {
+
+            lastTask = entry.getKey();
+            currentChance += entry.getValue();
 
             if (number < currentChance) {
-                return task;
+                return entry.getKey();
             }
         }
 
-        // If it didn't land on an assignment, it landed on the break section.
-        if (breakTask.getWeight() > 0.0) {
-            return breakTask;
+        // Since TaskData doesn't have a break option yet,
+        // I'm returning null whenever the wheel lands on a break.
+        if (breakChance > 0.0) {
+            return null;
         }
 
-        // If breaks are turned off, this also covers small rounding differences.
-        return tasks.get(tasks.size() - 1);
+        // This is just in case of any small rounding differences.
+        return lastTask;
     }
 
     public void setBreakProbability(double probability) {
-        // The break chance can be changed later, but it needs to be valid.
-        if (!Double.isFinite(probability) || probability < 0.0 || probability >= 1.0) {
-            throw new IllegalArgumentException("Break chance must be between 0 and 1 (not including 1)");
+
+        // Making sure the break chance is valid and isn't 100%.
+        // Otherwise there wouldn't be a chance to pick an assignment.
+        if (!Double.isFinite(probability) ||
+                probability < 0.0 || probability >= 1.0) {
+            throw new IllegalArgumentException(
+                    "Break chance must be from 0 up to (but not including) 1");
         }
 
         breakChance = probability;
@@ -137,7 +137,3 @@ public class RouletteWheel {
         return breakChance;
     }
 
-    public Task getBreakTask() {
-        return breakTask;
-    }
-}
