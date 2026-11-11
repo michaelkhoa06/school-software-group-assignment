@@ -174,8 +174,13 @@ public class RoulettePlannerCore {
     // Private Methods
     // =================================================================
 
+    private void notifyUI() {
+        DataSnapshot snapshot = new DataSnapshot(selectedTask, activeTasks, taskHistory, pointBalance, purchases);
+        ui.updateData(snapshot);
+    }
+
     private void notifyStorage() {
-        DataSnapshot snapshot = new DataSnapshot(null, activeTasks.keySet(), taskHistory, pointBalance, purchases);
+        DataSnapshot snapshot = new DataSnapshot(selectedTask, activeTasks, taskHistory, pointBalance, purchases);
         storage.updateData(snapshot);
     }
 
